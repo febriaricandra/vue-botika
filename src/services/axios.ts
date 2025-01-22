@@ -1,6 +1,7 @@
 import axios from 'axios';
 import type { InternalAxiosRequestConfig, AxiosInstance, AxiosError,AxiosResponse } from 'axios';
 import AuthService from './AuthService';
+import { router } from '@/router';
 
 const axiosInstance: AxiosInstance = axios.create({
     baseURL: import.meta.env.VITE_API_URL,
@@ -29,18 +30,11 @@ axiosInstance.interceptors.response.use(
         if (originalRequest && error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
             try {
-                const refreshToken = localStorage.getItem('refresh_token');
-                if (refreshToken) {
-                    const { access_token } = await AuthService.refresh();
-                    localStorage.setItem('access_token', access_token);
-                    axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-                    if (originalRequest) {
-                        originalRequest.headers['Authorization'] = `Bearer ${access_token}`;
-                    }
-                    return axiosInstance(originalRequest);
-                }
+                localStorage.removeItem("access_token");
+                router.push({name:'/auth/login'});
             } catch (refreshError) {
                 console.error('Refresh token failed:', refreshError);
+                localStorage.clear();
             }
         }
         return Promise.reject(error);

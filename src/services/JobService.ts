@@ -3,6 +3,7 @@ import axiosInstance from './axios';
 export interface Job {
     id: number;
     title: string;
+    // division: Division;
     description: string;
     created_at: string;
     updated_at: string;

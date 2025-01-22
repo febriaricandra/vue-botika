@@ -3,12 +3,11 @@ import { ref, onMounted, watch } from 'vue';
 import EmployeeService from '@/services/EmployeeService';
 import DivisionService from '@/services/DivisionService';
 import type { Division } from '@/services/DivisionService';
-import type { Employee} from '@/services/EmployeeService';
+import type { Employee } from '@/services/EmployeeService';
 import type { Job } from '@/services/JobService';
 import Modal from '@/components/shared/Modal.vue';
 import JobService from '@/services/JobService';
 import Swal from 'sweetalert2';
-
 
 const employees = ref<Employee[]>([]);
 const divisions = ref<Division[]>([]);
@@ -24,7 +23,7 @@ const totalPages = ref<number>(1);
 const selectedEmployee = ref<Employee | null>(null);
 const dialog = ref<boolean>(false);
 const addDialog = ref<boolean>(false);
-
+const editDialog = ref<boolean>(false);
 const newEmployee = ref({
     id: 0,
     name: '',
@@ -39,13 +38,12 @@ const tableActionData = ref([
     { listtitle: 'Delete', icon: 'mdi-delete' },
 ]);
 
-const fetchEmployees = async () => {
+const fetchEmployees = async (page: number = 1) => {
     try {
-        const response = await EmployeeService.getEmployees(division.value, status.value, search.value);
+        const response = await EmployeeService.getEmployees(division.value, status.value, search.value, page);
         employees.value = response.data;
         currentPage.value = response.current_page;
         totalPages.value = response.last_page;
-        console.log(employees);
     } catch (error) {
         console.error('Error fetching employees:', error);
         errorMessage.value = 'Failed to fetch employees. Please try again later.';
@@ -57,10 +55,10 @@ const fetchJobs = async () => {
         const response = await JobService.getJobs();
         jobs.value = response;
     } catch (error) {
-        console.error('Error fetching jobs:', error)
-        errorMessage.value = 'Failed to fetch jobs. Please try again later.'
+        console.error('Error fetching jobs:', error);
+        errorMessage.value = 'Failed to fetch jobs. Please try again later.';
     }
-}
+};
 
 const fetchDivisions = async () => {
     try {
@@ -74,7 +72,7 @@ const fetchDivisions = async () => {
 
 const changePage = (page: number) => {
     currentPage.value = page;
-    fetchEmployees();
+    fetchEmployees(page);
 };
 
 const openDialog = (employee: Employee) => {
@@ -91,6 +89,22 @@ const openAddDialog = () => {
     addDialog.value = true;
 };
 
+const openEditDialog = (employee: Employee) => {
+    editDialog.value = true;
+    selectedEmployee.value = employee;
+}
+
+const closeEditDialog = () => {
+    editDialog.value = false;
+    newEmployee.value = {
+        id: 0,
+        name: '',
+        status: '',
+        job_id: 0,
+        created_at: '',
+        updated_at: ''
+    };
+}
 const closeAddDialog = () => {
     addDialog.value = false;
     newEmployee.value = {
@@ -102,6 +116,7 @@ const closeAddDialog = () => {
         updated_at: ''
     };
 };
+
 const addEmployee = async () => {
     try {
         await EmployeeService.createEmployee(newEmployee.value);
@@ -125,13 +140,74 @@ const addEmployee = async () => {
     }
 };
 
+const updateEmployee = async () => {
+    if (!newEmployee.value.name || !newEmployee.value.job_id || !newEmployee.value.status) {
+        errorMessage.value = 'All fields are required.';
+        return;
+    }
+
+    try {
+        await EmployeeService.updateEmployee(newEmployee.value.id, newEmployee.value);
+        await fetchEmployees();
+        closeEditDialog();
+        Swal.fire({
+            title: "Good job!",
+            text: "Updated Employee!",
+            icon: "success"
+        });
+        addDialog.value = false;
+    } catch (error) {
+        console.error('Error update employee:', error);
+        errorMessage.value = 'Failed to update employee. Please try again later.';
+        Swal.fire({
+            title: "Bad!",
+            text: "Couldn't update employee!",
+            icon: "error"
+        });
+        addDialog.value = false;
+    }
+}
+
+const confirmDelete = (employee: Employee) => {
+    console.log(employee);
+    Swal.fire({
+        title: 'Are you sure?',
+        text: `Do you really want to delete "${employee.name}"?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'No, keep it'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // deleteJob(job.id);
+            Swal.fire(
+                'Deleted!',
+                'The Job has been deleted.',
+                'success'
+            );
+        }
+    });
+};
+
 onMounted(() => {
     fetchEmployees();
     fetchJobs();
     fetchDivisions();
 });
 
-watch([division, status, search], fetchEmployees);
+
+// memantau perubahan pada currentPage, untuk di assign ke fungsi
+watch(currentPage, (newPage) => {
+    fetchEmployees(newPage);
+});
+
+/** memantau perubahan pada division, status, search
+ * dan mengubah currentPage menjadi 1 saat terjadi perubahan
+ * */
+watch([division, status, search], () => {
+    currentPage.value = 1;
+    fetchEmployees(currentPage.value)
+});
 </script>
 
 <template>
@@ -143,9 +219,9 @@ watch([division, status, search], fetchEmployees);
                 <div class="filters">
                     <v-text-field v-model="search" label="Search by name" @input="fetchEmployees" />
                     <v-select v-model="division" :items="divisions.map(division => division.name)"
-                        label="Filter by division" @update:modelValue="fetchEmployees" />
+                        label="Filter by division" @update:modelValue="() => fetchEmployees()" />
                     <v-select v-model="status" :items="['active', 'inactive']" label="Filter by status"
-                        @update:modelValue="fetchEmployees" />
+                        @update:modelValue="() => fetchEmployees()" />
                 </div>
                 <v-btn color="primary" @click="openAddDialog">Add Employee</v-btn>
             </div>
@@ -184,7 +260,7 @@ watch([division, status, search], fetchEmployees);
                                             <v-list elevation="10">
                                                 <v-list-item value="action" v-for="list in tableActionData"
                                                     :key="list.listtitle" hide-details min-height="38"
-                                                    @click="openDialog(employee)">
+                                                    @click="list.listtitle === 'Delete' ? confirmDelete(employee) : openEditDialog(employee)">
                                                     <v-list-item-title>
                                                         {{ list.listtitle }}
                                                     </v-list-item-title>
@@ -234,6 +310,23 @@ watch([division, status, search], fetchEmployees);
         <template #actions>
             <v-btn color="primary" @click="addEmployee">Add</v-btn>
             <v-btn color="secondary" @click="closeAddDialog">Cancel</v-btn>
+        </template>
+    </Modal>
+    <Modal :modelValue="editDialog" @update:modelValue="closeEditDialog">
+        <template #title>
+            Update Employee
+        </template>
+        <template #content>
+            <v-form>
+                <v-text-field v-model="newEmployee.name" label="Name" required />
+                <v-select v-model="newEmployee.job_id" :items="jobs" item-value="id" item-text="title" label="Job"
+                    required />
+                <v-select v-model="newEmployee.status" :items="['active', 'inactive']" label="Status" required />
+            </v-form>
+        </template>
+        <template #actions>
+            <v-btn color="primary" @click="updateEmployee">Add</v-btn>
+            <v-btn color="secondary" @click="closeEditDialog">Cancel</v-btn>
         </template>
     </Modal>
 </template>

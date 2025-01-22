@@ -1,10 +1,10 @@
 <template>
     <v-dialog v-model="isOpen" max-width="500px">
         <v-card>
-            <v-card-title>
+            <v-card-title class="d-flex justify-between align-center">
                 <slot name="title">Default Title</slot>
                 <v-spacer></v-spacer>
-                <v-btn icon @click="close">
+                <v-btn icon @click="close" size="small">
                     <v-icon>mdi-close</v-icon>
                 </v-btn>
             </v-card-title>

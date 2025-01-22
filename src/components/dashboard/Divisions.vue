@@ -11,6 +11,7 @@ const selectedDivision = ref<Division | null>(null);
 const errorMessage = ref<string | undefined>(undefined);
 const dialog = ref<boolean>(false);
 const addDialog = ref<boolean>(false);
+const editDialog = ref<boolean>(false);
 
 const tableActionData = ref([
     { listtitle: 'Edit', icon: 'mdi-pencil' },
@@ -73,6 +74,34 @@ const deleteDivision = async (id: number) => {
     }
 };
 
+const openEditDialog = (division: Division) => {
+    editDialog.value = true;
+    selectedDivision.value = division;
+}
+
+const closeEditDialog = () => {
+    editDialog.value = false;
+    newDivision.value = {
+        name: '',
+    }
+}
+
+const updateDivision = async () => {
+    if (!newDivision.value.name) {
+        errorMessage.value = "fields name are required";
+        return;
+    }
+
+    try {
+        await DivisionService.updateDivision(selectedDivision.value?.id, newDivision.value)
+        fetchDivisions();
+        closeEditDialog();
+    } catch (error) {
+        console.error('Error updating division:', error);
+        errorMessage.value = 'Failed to update division. Please try again later.';
+    }
+}
+
 const confirmDelete = (division: Division) => {
     Swal.fire({
         title: 'Are you sure?',
@@ -134,7 +163,7 @@ onMounted(() => {
                                             <v-list elevation="10">
                                                 <v-list-item value="action" v-for="list in tableActionData"
                                                     :key="list.listtitle" hide-details min-height="38"
-                                                    @click="list.listtitle === 'Delete' ? confirmDelete(division) : openDialog(division)">
+                                                    @click="list.listtitle === 'Delete' ? confirmDelete(division) : openEditDialog(division)">
                                                     <v-list-item-title>
                                                         {{ list.listtitle }}
                                                     </v-list-item-title>
@@ -177,6 +206,20 @@ onMounted(() => {
         <template #actions>
             <v-btn color="primary" @click="addDivision">Add</v-btn>
             <v-btn color="secondary" @click="closeAddDialog">Cancel</v-btn>
+        </template>
+    </Modal>
+
+    <!-- Edit Job Modal -->
+    <Modal :modelValue="editDialog" @update:modelValue="closeEditDialog">
+        <template #title>Edit Job</template>
+        <template #content>
+            <v-form>
+                <v-text-field v-model="newDivision.name" label="Name" required />
+            </v-form>
+        </template>
+        <template #actions>
+            <v-btn color="primary" @click="updateDivision">Update</v-btn>
+            <v-btn color="secondary" @click="closeEditDialog">Cancel</v-btn>
         </template>
     </Modal>
 </template>

@@ -27,8 +27,8 @@ export interface EmployeeResponse {
     total: number;
 }
 
-const getEmployees = async (division?: string, status?: string, search?: string): Promise<EmployeeResponse> => {
-    const params: Record<string, string | undefined> = {};
+const getEmployees = async (division?: string, status?: string, search?: string, page: number = 1): Promise<EmployeeResponse> => {
+    const params: Record<string, string | number | undefined> = {page };
     if (division) params.division = division;
     if (status) params.status = status;
     if (search) params.search = search;
